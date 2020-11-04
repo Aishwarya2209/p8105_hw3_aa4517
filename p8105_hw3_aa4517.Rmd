@@ -1,0 +1,252 @@
+---
+title: "Homework 3"
+author: "Aishwarya Anuraj"
+output: github_document
+---
+
+```{r setup}
+library(tidyverse)
+library(p8105.datasets)
+library(patchwork)
+library(plotly)
+
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = 0.6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+## Problem 1 
+
+### Part 1 
+
+Load Instacart dataset.
+
+```{r load_data_1}
+data("instacart")
+```
+
+“The Instacart Online Grocery Shopping Dataset 2017” is an anonymous dataset with `r nrow(instacart)` observations and `r ncol(instacart)` columns. The variable names are `r names(instacart)`. These include names as character variables, and other numeric variables. Key information of interest are products, aisles (contains categorized products) and department (contains categorized aisles).  
+
+### Part 2 
+
+How many aisles are there, and which aisles are the most items ordered from?
+
+```{r count_and_order_1}
+q1_part2 = 
+instacart %>% 
+  count(aisle) %>% 
+  arrange(desc(n)) # arranging in reverse order to know in which aisles are the most items ordered from. 
+```
+
+There are `r nrow(q1_part2)` aisles and fresh vegetables are the most ordered from. 
+
+### Part 3 
+
+Make a plot that shows the number of items ordered in each aisle, limiting this to aisles with more than 10000 items ordered. Arrange aisles sensibly, and organize your plot so others can read it.
+
+```{r count_and_order_2}
+instacart %>% 
+  count(aisle) %>% 
+  filter(n > 10000) %>% 
+  mutate(
+    aisle = factor(aisle),
+    aisle = fct_reorder(aisle, n)
+  ) %>% 
+  ggplot(aes(x = aisle, y = n,)) +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+### Part 4 
+
+Make a table showing the three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”. Include the number of times each item is ordered in your table.
+
+```{r count_and_order_3}
+instacart %>% 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>% 
+   group_by(aisle) %>% 
+  count(product_name) %>% 
+  mutate(rank = min_rank(desc(n))) %>% 
+  filter(rank <= 3) %>% 
+  arrange(aisle, rank) %>% 
+  relocate(rank, n) %>% 
+  knitr::kable()
+```
+
+### Part 5 
+
+Make a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week; format this table for human readers (i.e. produce a 2 x 7 table).
+
+```{r count_and_order_4}
+instacart %>% 
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>% 
+  group_by(product_name, order_dow) %>% 
+  summarize(mean_hour = mean(order_hour_of_day)) %>% 
+  pivot_wider(
+    names_from = order_dow,
+    values_from = mean_hour
+  ) %>% 
+  knitr::kable()
+```
+
+## Problem 2 
+
+### Part 1 
+
+```{r read_and_clean_data_1}
+accel_df = (
+  read_csv(file = "./data/accel_data.csv") %>% 
+  janitor::clean_names() %>% 
+    mutate(
+      day = as.factor(day)) %>% 
+    pivot_longer(
+      activity_1:activity_1440,
+      names_to = "activity_min",
+      values_to = "activity_count"
+    ) %>% 
+    separate(activity_min, into = c("activity", "activity_min"), sep = "_") %>% 
+    select(-activity) %>% 
+    mutate(activity_min = as.numeric(activity_min)) %>% 
+    mutate(
+    week_type = case_when(
+      day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday",
+      day %in% c("Saturday", "Sunday") ~ "Weekend",
+      TRUE ~ ""
+    ),
+    day = forcats::fct_relevel(day, c("Monday", "Tuesday", "Wednesday","Thursday", "Friday","Saturday", "Sunday"))
+  ))
+```
+
+This dataset contains details on the accelerometer data recorded among 63 year old males admitted to the advanced cardiac care center at Columbia University Medical Center and diagnosed with congestive heart failure. This dataset contains  `r nrow(accel_df)` observations and `r ncol(accel_df)` variables. The variable names are `r names(accel_df)`. The observations are recorded for five weeks and the weeks are numbered from 1 to 5. The key variable of interest are activity_count and activity_min that give us information on the activity counts for each minute of a 24-hour day starting at midnight.
+
+### Part 2 
+
+Traditional analyses of accelerometer data focus on the total activity over the day. Using your tidied dataset, aggregate across minutes to create a total activity variable for each day, and create a table showing these totals. Are any trends apparent?
+
+```{r count_and_order5}
+accel_df %>% 
+  group_by(week, day) %>% 
+  summarize(total_activity = sum(activity_count)) %>% 
+  pivot_wider(
+    names_from = day,
+    values_from = total_activity
+  ) %>% 
+  knitr::kable()
+```
+
+The weekends seem to have lower activities than the weekday. 
+
+### Part 3 
+
+```{r graph_1}
+accel_df %>%
+  group_by(day, week, activity_min) %>%
+  summarize(total_activity = sum(activity_count)) %>% 
+  ggplot(aes(x = activity_min, y = total_activity, color = day)) +
+  scale_x_continuous(name = "Minutes in a day", limits = c(0, 1440)) +
+  geom_point() +
+  geom_line()
+```
+
+The graph shows that activity on Sunday is highest during the midday and for Friday activity is highest during the end of the day. We can't appreciate the differences between the different weeks in this plot.  
+
+## Problem 3 
+
+### Part 1 
+
+```{r load_data_2}
+data("ny_noaa")
+summary(ny_noaa)
+```
+
+The NOAA dataset contains `r nrow(ny_noaa)` observations and `r ncol(ny_noaa)` variables. The names of the variables are `r names(ny_noaa)`. The key variables of interest are prcp, snow, tmax and tmin. There are 145838 missing data in the prcp column, 381221 missing data in the snow coloumn and 591786 missing data in the snwd column. The high number of missing variables needs to be taken into account when we go ahead with data wrangling or plotting. 
+
+### Part 2 
+
+```{r read_and_clean_data_2}
+ny_noaa_df = (
+  ny_noaa %>% 
+  janitor::clean_names() %>% 
+  separate(date, into = c("year", "month", "day"), sep = "-") %>% 
+  mutate(
+    year = as.numeric(year),
+    month = as.numeric(month),
+    day = as.numeric(day),
+    tmax = as.numeric(tmax),
+    tmin = as.numeric(tmin)
+  ))
+  # keep all the missing variables for now. 
+```
+
+Each observation for temperature, precipitation and snowfall are given reasonable units. 
+
+```{r count_and_order6}
+ny_noaa_df %>% 
+  count(snow) %>% 
+  arrange(desc(n))
+```
+
+For snowfall the three most commonly observed values are 25 (31022 values), 13(23095 values) and 51(18274 values). (Excluding the times there were no snowfall, which was the highest observations indicating that there was no snowfall most of the time and the missing values)
+
+### Part 3 
+
+Make a two-panel plot showing the average max temperature in January and in July in each station across years. Is there any observable / interpretable structure? Any outliers?
+
+```{r graph_2}
+ny_noaa_df %>% 
+  filter(month == c(1, 7)) %>%
+  group_by(year, id, month) %>% 
+  drop_na() %>%
+  summarize(max_temp = mean(tmax)) %>% 
+  ggplot(aes(x = year, y = max_temp)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE) +
+  facet_grid(. ~ month)
+```
+
+From the graph we can see that the average maximum temperature is higher in July than in January. The lowest average maximum temperature in July is higher than the highest average maximum temperature in January. There are a few outliers but not enough to skewer the general interpretation of the graph. 
+
+### Part 4 
+
+Make a two-panel plot showing (i) tmax vs tmin for the full dataset (note that a scatterplot may not be the best option); and (ii) make a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year.
+
+
+```{r graph_3}
+plot1 = (
+  ny_noaa_df %>%
+    drop_na() %>% 
+    ggplot(aes(x = tmax, y = tmin)) +
+    geom_hex()
+    )
+
+plot2 = (
+    ny_noaa_df %>% 
+    filter(snow < 100) %>% 
+      filter(snow > 0) %>% 
+      group_by(year) %>% 
+      drop_na() %>% 
+      ggplot(aes( x = month, y = snow)) +
+      geom_violin() +
+      facet_grid(. ~ year)
+        )
+plot1 / plot2
+```
+
+Description - plot2 - There was more snowfalls in the years 1999 and 1994 compared to others but the snowfall is mostly consistent. 
+
+
+
+
